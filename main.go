@@ -9,8 +9,6 @@ import (
 	"context"
 	"golang.org/x/sync/semaphore"
 	"net"
-	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -18,23 +16,6 @@ import (
 type PortScanner struct {
 	ip   string
 	lock *semaphore.Weighted
-}
-
-func Ulimit() int64 {
-	out, err := exec.Command("ulimit", "-n").Output()
-	if err != nil {
-		panic(err)
-	}
-
-	s := strings.TrimSpace(string(out))
-
-	i, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		panic(err)
-	}
-
-	println(i)
-	return i
 }
 
 func ScanPort(ip string, port int, timeout time.Duration) {
@@ -72,7 +53,7 @@ func main() {
 
 	ps := &PortScanner{
 		ip:   "127.0.0.1",
-		lock: semaphore.NewWeighted(Ulimit()),
+		lock: semaphore.NewWeighted(65536),
 	}
 	ps.Start(1, 65535, 500*time.Millisecond)
 	fmt.Println(time.Since(start))

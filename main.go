@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"time"
 )
 
@@ -46,6 +47,8 @@ func (ps *PortScanner) Start(f, l int, timeout time.Duration) {
 			ScanPort(ps.ip, port, timeout)
 		}(port)
 	}
+
+	fmt.Println(runtime.NumGoroutine())
 }
 
 func main() {

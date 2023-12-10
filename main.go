@@ -53,7 +53,7 @@ func main() {
 
 	ps := &PortScanner{
 		ip:   "127.0.0.1",
-		lock: semaphore.NewWeighted(65536),
+		lock: semaphore.NewWeighted(256),
 	}
 	ps.Start(1, 65535, 500*time.Millisecond)
 	fmt.Println(time.Since(start))

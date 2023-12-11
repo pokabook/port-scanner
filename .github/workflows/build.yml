@@ -23,7 +23,7 @@ jobs:
 
       - name: go run
         run: |
-          go run .
+          sudo go run .
 
       - name: ulimit
         run: |

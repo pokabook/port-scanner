@@ -24,3 +24,9 @@ jobs:
       - name: go run
         run: |
           go run .
+
+      - name: ulimit
+        run: |
+            ulimit -a
+            ulimit -aH
+            ulimit -n

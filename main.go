@@ -15,8 +15,12 @@ import (
 type PortScanner struct {
 	ip        string
 	lock      sync.Mutex
-	semaphore *semaphore.Weighted
+	cond      *sync.Cond
 	available int64
+}
+
+type Scanner interface {
+	StartScan(ip string, f, l int, timeout time.Duration)
 }
 
 func Ulimit() int64 {
@@ -35,6 +39,27 @@ func Ulimit() int64 {
 	return i
 }
 
+type SemaphoreScanner struct{}
+type MutexScanner struct{}
+type MonitorScanner struct{}
+type SequentialScanner struct{}
+
+func (SemaphoreScanner) StartScan(ip string, f, l int, timeout time.Duration) {
+	StartWithSemaphore(ip, f, l, timeout)
+}
+
+func (MutexScanner) StartScan(ip string, f, l int, timeout time.Duration) {
+	StartWithMutex(ip, f, l, timeout)
+}
+
+func (MonitorScanner) StartScan(ip string, f, l int, timeout time.Duration) {
+	StartWithMonitor(ip, f, l, timeout)
+}
+
+func (SequentialScanner) StartScan(ip string, f, l int, timeout time.Duration) {
+	StartWithSequential(ip, f, l, timeout)
+}
+
 func TCPScanPort(ip string, port int, timeout time.Duration) {
 	target := fmt.Sprintf("%s:%d", ip, port)
 	conn, err := net.DialTimeout("tcp", target, timeout)
@@ -46,7 +71,8 @@ func TCPScanPort(ip string, port int, timeout time.Duration) {
 		}
 		return
 	}
-	fmt.Println(target)
+
+	//fmt.Println(target)
 
 	conn.Close()
 }
@@ -64,8 +90,6 @@ func StartWithSemaphore(ip string, f, l int, timeout time.Duration) {
 			defer sem.Release(1)
 			defer wg.Done()
 			TCPScanPort(ip, port, timeout)
-			//HalfOpenScanPort(ip, port, timeout)
-			//StealthScanPort(ip, port, timeout)
 		}(port)
 	}
 }
@@ -90,15 +114,13 @@ func StartWithMonitor(ip string, f, l int, timeout time.Duration) {
 	ps := &PortScanner{
 		ip:        ip,
 		available: Ulimit(),
-		semaphore: semaphore.NewWeighted(Ulimit()),
 	}
+	ps.cond = sync.NewCond(&ps.lock)
 
 	for port := f; port <= l; port++ {
 		ps.lock.Lock()
 		for ps.available <= 0 {
-			ps.lock.Unlock()
-			time.Sleep(time.Millisecond)
-			ps.lock.Lock()
+			ps.cond.Wait()
 		}
 		ps.available--
 		ps.lock.Unlock()
@@ -108,18 +130,23 @@ func StartWithMonitor(ip string, f, l int, timeout time.Duration) {
 
 			ps.lock.Lock()
 			ps.available++
+			ps.cond.Signal()
 			ps.lock.Unlock()
 		}(port)
+	}
+}
+
+func StartWithSequential(ip string, f, l int, timeout time.Duration) {
+	for port := f; port <= l; port++ {
+		TCPScanPort(ip, port, timeout)
 	}
 }
 
 func main() {
 	start := time.Now()
 
-	ip := "127.0.0.1" //
-	StartWithSemaphore(ip, 1, 65535, 500*time.Millisecond)
-	//StartWithMutex(ip, 1, 65535, 500*time.Millisecond)
-	//StartWithMonitor(ip, 1, 65535, 500*time.Millisecond)
-
+	ip := "127.0.0.1"
+	scanner := MonitorScanner{}
+	scanner.StartScan(ip, 1, 65535, 500*time.Millisecond)
 	fmt.Println(time.Since(start))
 }
